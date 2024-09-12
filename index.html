@@ -25,7 +25,7 @@
         body {
             margin: 0;
             font-family: 'Orbitron', sans-serif;
-            background-color: #ffffff;
+            background-color: #121212;
             color: #e0e0e0;
             display: flex;
             flex-direction: column;
@@ -33,24 +33,24 @@
         }
 
         h1 {
-            color: #ff0000;
+            color: #00ffc3;
             text-align: center;
             margin-top: 20px;
             font-size: 3em;
-            text-shadow: 0 0 10px rgba(105, 90, 40, 0.8);
+            text-shadow: 0 0 10px rgba(0, 255, 195, 0.8);
         }
 
         #map {
             height: 600px;
             width: 100%;
-            margin: 5px 0;
+            margin: 20px 0;
             border: 2px solid #00ffc3;
             border-radius: 12px;
             box-shadow: 0 0 20px rgba(0, 255, 195, 0.5);
         }
 
         #fileInput {
-            margin: 10px;
+            margin: 20px;
             padding: 10px 20px;
             background-color: #1e1e1e;
             color: #00ffc3;
@@ -123,6 +123,36 @@
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
+        // Function to map icon names to both problem and unit variables
+        function getProblemAndUnitFromIconName(iconName) {
+            switch (iconName) {
+                case 'blue_pin_classic':
+                    return { problem: 'Piringan Semak', unit: 'Meter' };
+                case 'green_pin_classic':
+                    return { problem: 'Pasar Pikul Semak', unit: 'Pokok' };
+                case 'gray_pin_classic':
+                    return { problem: 'Under Pruning', unit: 'Pokok' };
+                case 'indigo_pin_classic':
+                    return { problem: 'Gawangan Semak', unit: 'Pokok' };
+                case 'orange_pin_classic':
+                    return { problem: 'Titi Panen Kurang / Rusak', unit: 'Unit' };
+                case 'pink_pin_classic':
+                    return { problem: 'Areal Banjir / Rendahan', unit: 'Pokok' };
+                case 'purple_pin_classic':
+                    return { problem: 'Defisiensi Hara', unit: 'Pokok' };
+                case 'red_pin_classic':
+                    return { problem: 'HPT (Ganoderma)', unit: 'Pokok' };
+                case 'teal_pin_classic':
+                    return { problem: 'Titik Kosong', unit: 'Pokok' };
+                case 'yellow_pin_classic':
+                    return { problem: 'TPH Semak', unit: 'Pokok' };
+                case 'gray_pin':
+                    return { problem: 'Lain-lain', unit: 'Lain' };
+                default:
+                    return { problem: 'unknown', unit: 'unknown' };
+            }
+        }
+
         // Handle file input
         document.getElementById('fileInput').addEventListener('change', function(event) {
             var file = event.target.files[0];
@@ -169,7 +199,7 @@
                                     }
                                 },
                                 onEachFeature: function (feature, layer) {
-                                    // Pop up with name, description, and symbol
+                                    // Pop up with name, description, symbol, and picture
                                     var name = feature.properties.name || 'No Name';
                                     var description = feature.properties.description || 'No Description';
                                     var styleUrl = feature.properties.styleUrl;
@@ -177,10 +207,20 @@
                                     var iconUrl = styles[styleId]?.iconUrl;
                                     var iconName = styles[styleId]?.iconName || 'Default Symbol';
                                     
-                                    var popupContent = '<strong>' + name + '</strong><br>' +
-                                        '<div class="info">' + description + '</div>' +
+                                    // Get problem and unit from icon name
+                                    var details = getProblemAndUnitFromIconName(iconName);
+                                    
+                                    var popupContent =
+                                        '<strong>Problem: ' + details.problem + '</strong><br>' +
+                                        'Jumlah: <strong>' + name + '</strong>'+ ' '+ details.unit +'<br>' +
                                         '<br><strong>Symbol:</strong> ' + iconName;
                                     
+                                    // Check if description contains an image URL and append it
+                                    var imageUrl = description.match(/https?:\/\/[^\s]+(.jpg|.png|.gif)/);
+                                    if (imageUrl) {
+                                        popupContent += '<br><img src="' + imageUrl[0] + '" alt="Image" width="150" height="150">';
+                                    }
+
                                     if (iconUrl) {
                                         popupContent += '<br><img src="' + iconUrl + '" alt="Marker Symbol" width="32" height="32">';
                                     }
