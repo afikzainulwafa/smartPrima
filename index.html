@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart PRIMA - KMZ Map Viewer</title>
+    
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css" />
+    
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+    
+    <!-- JSZip for KMZ handling -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.6.0/jszip.min.js"></script>
+    
+    <!-- ToGeoJSON for converting KML to GeoJSON -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/togeojson/0.16.0/togeojson.min.js"></script>
+    
+    <!-- Google Fonts for Futuristic look -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    
+    <!-- Custom CSS for Futuristic Theme -->
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Orbitron', sans-serif;
+            background-color: #ffffff;
+            color: #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        h1 {
+            color: #ff0000;
+            text-align: center;
+            margin-top: 20px;
+            font-size: 3em;
+            text-shadow: 0 0 10px rgba(105, 90, 40, 0.8);
+        }
+
+        #map {
+            height: 600px;
+            width: 100%;
+            margin: 5px 0;
+            border: 2px solid #00ffc3;
+            border-radius: 12px;
+            box-shadow: 0 0 20px rgba(0, 255, 195, 0.5);
+        }
+
+        #fileInput {
+            margin: 10px;
+            padding: 10px 20px;
+            background-color: #1e1e1e;
+            color: #00ffc3;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1.2em;
+            transition: background-color 0.3s;
+        }
+
+        #fileInput:hover {
+            background-color: #00ffc3;
+            color: #1e1e1e;
+        }
+
+        .leaflet-popup-content-wrapper {
+            background-color: #1e1e1e;
+            color: #e0e0e0;
+            border-radius: 10px;
+        }
+
+        .leaflet-popup-tip {
+            background-color: #1e1e1e;
+        }
+
+        .info {
+            font-size: 1em;
+        }
+
+        .futuristic-button {
+            background-color: #00ffc3;
+            color: #121212;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 25px;
+            font-size: 1.2em;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .futuristic-button:hover {
+            background-color: #e0e0e0;
+            color: #00ffc3;
+        }
+
+        /* Responsive Design */
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 2em;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Smart PRIMA</h1>
+    
+    <!-- Futuristic Input -->
+    <input type="file" id="fileInput" class="futuristic-button" value="Load KMZ" />
+    
+    <!-- Map Container -->
+    <div id="map"></div>
+    
+    <script>
+        // Initialize the map
+        var map = L.map('map').setView([0, 0], 2);
+
+        // Add a futuristic tile layer
+        L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Handle file input
+        document.getElementById('fileInput').addEventListener('change', function(event) {
+            var file = event.target.files[0];
+            if (file && file.name.endsWith('.kmz')) {
+                var reader = new FileReader();
+                reader.onload = function(e) {
+                    JSZip.loadAsync(e.target.result).then(function(zip) {
+                        // Find and extract the KML file
+                        zip.file(/.*\.kml/)[0].async('string').then(function(kmlData) {
+                            var parser = new DOMParser();
+                            var kmlDom = parser.parseFromString(kmlData, 'text/xml');
+                            var geojsonData = toGeoJSON.kml(kmlDom);
+                            
+                            // Extract style information (icon or color)
+                            var styles = {};
+                            Array.from(kmlDom.getElementsByTagName('Style')).forEach(function(style) {
+                                var styleId = style.getAttribute('id');
+                                var icon = style.getElementsByTagName('Icon')[0];
+                                var iconUrl = icon ? icon.getElementsByTagName('href')[0].textContent : null;
+                                var iconName = iconUrl ? iconUrl.split('/').pop().split('.')[0] : 'Default Symbol';
+                                styles[styleId] = {
+                                    iconUrl: iconUrl,
+                                    iconName: iconName
+                                };
+                            });
+
+                            // Add the GeoJSON to the map
+                            L.geoJSON(geojsonData, {
+                                pointToLayer: function (feature, latlng) {
+                                    var styleUrl = feature.properties.styleUrl;
+                                    var styleId = styleUrl ? styleUrl.replace('#', '') : '';
+                                    var iconUrl = styles[styleId]?.iconUrl;
+                                    var iconName = styles[styleId]?.iconName || 'Default Symbol';
+
+                                    if (iconUrl) {
+                                        var customIcon = L.icon({
+                                            iconUrl: iconUrl,
+                                            iconSize: [32, 32], // Adjust size as needed
+                                            iconAnchor: [16, 32], // Adjust anchor point as needed
+                                        });
+                                        return L.marker(latlng, { icon: customIcon });
+                                    } else {
+                                        return L.marker(latlng); // Default marker
+                                    }
+                                },
+                                onEachFeature: function (feature, layer) {
+                                    // Pop up with name, description, and symbol
+                                    var name = feature.properties.name || 'No Name';
+                                    var description = feature.properties.description || 'No Description';
+                                    var styleUrl = feature.properties.styleUrl;
+                                    var styleId = styleUrl ? styleUrl.replace('#', '') : '';
+                                    var iconUrl = styles[styleId]?.iconUrl;
+                                    var iconName = styles[styleId]?.iconName || 'Default Symbol';
+                                    
+                                    var popupContent = '<strong>' + name + '</strong><br>' +
+                                        '<div class="info">' + description + '</div>' +
+                                        '<br><strong>Symbol:</strong> ' + iconName;
+                                    
+                                    if (iconUrl) {
+                                        popupContent += '<br><img src="' + iconUrl + '" alt="Marker Symbol" width="32" height="32">';
+                                    }
+                                    layer.bindPopup(popupContent);
+                                }
+                            }).addTo(map);
+
+                            // Adjust the view to fit all the features
+                            map.fitBounds(L.geoJSON(geojsonData).getBounds());
+                        });
+                    });
+                };
+                reader.readAsArrayBuffer(file);
+            } else {
+                alert('Please upload a valid KMZ file.');
+            }
+        });
+    </script>
+</body>
+</html>
